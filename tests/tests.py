@@ -137,7 +137,8 @@ def _parse_cli_top_out(out):
     return data[::-1]
 
 
-def run_passiverecon_worker(bulk_mode=None):
+def run_passiverecon_worker(bulk_mode=None, input_format=None):
+    print("bulk_mode = %s, input_format = %s" % (bulk_mode, input_format))
     time.sleep(1)  # Hack for Travis CI
     pid = os.fork()
     if pid < 0:
@@ -150,6 +151,10 @@ def run_passiverecon_worker(bulk_mode=None):
         os.kill(pid, signal.SIGINT)
         os.waitpid(pid, 0)
     elif USE_COVERAGE:
+        print(
+            "USE_COVERAGE : bulk_mode = %s, input_format = %s"
+            % (bulk_mode, input_format)
+        )
         os.execvp(
             sys.executable,
             COVERAGE
@@ -170,11 +175,13 @@ def run_passiverecon_worker(bulk_mode=None):
                         which("ivre"),
                         "passiverecon2db",
                         bulk_mode,
+                        input_format,
                     ]
                 ),
             ],
         )
     else:
+        print("ELSE : bulk_mode = %s, input_format = %s" % (bulk_mode, input_format))
         os.execlp(
             "ivre",
             "ivre",
@@ -182,7 +189,7 @@ def run_passiverecon_worker(bulk_mode=None):
             "--directory",
             "logs",
             "--progname",
-            "ivre passiverecon2db %s" % bulk_mode,
+            "ivre passiverecon2db %s %s" % (bulk_mode, input_format),
         )
 
 
@@ -1887,9 +1894,11 @@ class IvreTests(unittest.TestCase):
         if DATABASE == "postgres":
             # FIXME: tests are broken with PostgreSQL & --no-bulk
             bulk_mode = random.choice(["--bulk", "--local-bulk"])
+            input_format = " ".join(["--input-format", random.choice(["tsv", "json"])])
         else:
             bulk_mode = random.choice(["--bulk", "--no-bulk", "--local-bulk"])
-        print("Running passive tests with %s" % bulk_mode)
+            input_format = " ".join(["--input-format", random.choice(["tsv", "json"])])
+        print("Running passive tests with %s %s" % (bulk_mode, input_format))
 
         # Init DB
         self.assertEqual(RUN(["ivre", "ipinfo", "--count"])[1], b"0\n")
@@ -1916,7 +1925,10 @@ class IvreTests(unittest.TestCase):
                         ivre.config.guess_prefix("zeek"),
                         "ivre",
                         "passiverecon",
-                        "bare.zeek",
+                        "bare%s"
+                        % (lambda x: "_json.zeek" if "json" in x else ".zeek")(
+                            input_format
+                        ),
                     ),
                     "-e",
                     "redef tcp_content_deliver_all_resp = T; "
@@ -1926,7 +1938,7 @@ class IvreTests(unittest.TestCase):
             )
             zeekprocess.wait()
 
-        run_passiverecon_worker(bulk_mode=bulk_mode)
+        run_passiverecon_worker(bulk_mode=bulk_mode, input_format=input_format)
 
         # Counting
         total_count = ivre.db.db.passive.count(ivre.db.db.passive.flt_empty)

@@ -19,6 +19,7 @@
 """Support for Zeek log files"""
 
 import datetime
+import json
 import re
 from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
 
@@ -149,3 +150,20 @@ class ZeekFile(Parser):
                 ]
             ]
         )
+
+
+class JsonFile(Parser):
+    """Zeek Json parser"""
+
+    def parse_line(self, line: bytes) -> Dict[str, Any]:
+        res: Dict[str, Any] = json.loads(line)
+        if "_path" in res:
+            del res["_path"]
+        if "_write_ts" in res:
+            del res["_write_ts"]
+        res = {
+            k: (isinstance(v, str) and v.encode(errors="replace") or v)
+            for k, v in res.items()
+        }
+        res["ts"] = datetime.datetime.strptime(res["ts"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        return res

@@ -198,6 +198,7 @@ setup(
             [
                 "zeek/ivre/passiverecon/__load__.zeek",
                 "zeek/ivre/passiverecon/bare.zeek",
+                "zeek/ivre/passiverecon/bare_json.zeek",
                 "zeek/ivre/passiverecon/hassh.zeek",
                 "zeek/ivre/passiverecon/ja3.zeek",
                 "zeek/ivre/passiverecon/ntlm.zeek",

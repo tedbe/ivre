@@ -24,7 +24,7 @@ from argparse import ArgumentParser
 import functools
 import signal
 import sys
-from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
 
 import ivre.db
@@ -64,7 +64,9 @@ def rec_iter(
     sensor: Optional[str],
     ignore_rules: Dict[str, Dict[str, List[Tuple[int, int]]]],
 ) -> Generator[Tuple[Optional[int], Record], None, None]:
+    print("rec_iter")
     for line in zeek_parser:
+        print(line)
         line["timestamp"] = line.pop("ts")
         # skip PassiveRecon::
         line["recon_type"] = line["recon_type"][14:]
@@ -89,6 +91,12 @@ def main() -> None:
     parser.add_argument(
         "--no-bulk", action="store_true", help="Do not use bulk inserts"
     )
+    parser.add_argument(
+        "--input-format",
+        choices=["tsv", "json"],
+        default="tsv",
+        help="Input files format",
+    )
     args = parser.parse_args()
     ignore_rules = _get_ignore_rules(args.ignore_spec)
     if (not (args.no_bulk or args.local_bulk)) or args.bulk:
@@ -100,7 +108,12 @@ def main() -> None:
             ivre.db.DBPassive.insert_or_update_bulk,
             ivre.db.db.passive,
         )
-    zeek_parser = ivre.parser.zeek.ZeekFile(sys.stdin.buffer)
+    zeek_parser: Union[ivre.parser.zeek.JsonFile, ivre.parser.zeek.ZeekFile]
+    if args.input_format == "tsv":
+        zeek_parser = ivre.parser.zeek.ZeekFile(sys.stdin.buffer)
+    elif args.input_format == "json":
+        print("passiverecon2db ==> json switch")
+        zeek_parser = ivre.parser.zeek.JsonFile(sys.stdin.buffer)
     function(
         rec_iter(zeek_parser, args.sensor, ignore_rules), getinfos=ivre.passive.getinfos
     )
